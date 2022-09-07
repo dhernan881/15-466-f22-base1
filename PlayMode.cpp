@@ -182,6 +182,9 @@ PlayMode::PlayMode() {
 	// 	std::cout << glm::to_string(ppu.palette_table[i][3]);
 	// 	std::cout << std::endl;
 	// }
+
+	player1.pos = glm::vec2(0.0f);
+	player2.pos = glm::vec2(256.0 - 8.0f, 240.0 - 8.0f);
 }
 
 PlayMode::~PlayMode() {
@@ -206,6 +209,22 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			down.downs += 1;
 			down.pressed = true;
 			return true;
+		} else if (evt.key.keysym.sym == SDLK_w) {
+			w.downs += 1;
+			w.pressed = true;
+			return true;
+		} else if (evt.key.keysym.sym == SDLK_a) {
+			a.downs += 1;
+			a.pressed = true;
+			return true;
+		} else if (evt.key.keysym.sym == SDLK_s) {
+			s.downs += 1;
+			s.pressed = true;
+			return true;
+		} else if (evt.key.keysym.sym == SDLK_d) {
+			d.downs += 1;
+			d.pressed = true;
+			return true;
 		}
 	} else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_LEFT) {
@@ -220,10 +239,39 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		} else if (evt.key.keysym.sym == SDLK_DOWN) {
 			down.pressed = false;
 			return true;
+		} else if (evt.key.keysym.sym == SDLK_w) {
+			w.pressed = false;
+			return true;
+		} else if (evt.key.keysym.sym == SDLK_a) {
+			a.pressed = false;
+			return true;
+		} else if (evt.key.keysym.sym == SDLK_s) {
+			s.pressed = false;
+			return true;
+		} else if (evt.key.keysym.sym == SDLK_d) {
+			d.pressed = false;
+			return true;
 		}
 	}
 
 	return false;
+}
+
+void PlayMode::Player::Rotate(int dir) {
+	if (rotation_cooldown > 0.0f)
+		return;
+	rotation_cooldown = Player::RotationDelay;
+	switch (dir) {
+		case 1:
+			rotation_state = (rotation_state + 1) % 16;
+			break;
+		case -1:
+			// weird bug where mod not working properly??
+			rotation_state = (rotation_state + 15) % 16;
+			break;
+		default:
+			std::cerr << "Invalid rotation value: " << dir << "\n";
+	}
 }
 
 void PlayMode::update(float elapsed) {
@@ -233,29 +281,80 @@ void PlayMode::update(float elapsed) {
 	background_fade += elapsed / 10.0f;
 	background_fade -= std::floor(background_fade);
 
-	constexpr float PlayerSpeed = 30.0f;
-	if (left.pressed) player_at.x -= PlayerSpeed * elapsed;
-	if (right.pressed) player_at.x += PlayerSpeed * elapsed;
-	if (down.pressed) player_at.y -= PlayerSpeed * elapsed;
-	if (up.pressed) player_at.y += PlayerSpeed * elapsed;
+	// if (left.pressed) player_at.x -= PlayerSpeed * elapsed;
+	// if (right.pressed) player_at.x += PlayerSpeed * elapsed;
+	// if (down.pressed) player_at.y -= PlayerSpeed * elapsed;
+	// if (up.pressed) player_at.y += PlayerSpeed * elapsed;
+
+	// HANDLE player1 MOVEMENT
+	if (a.pressed && !d.pressed) {
+		player1.Rotate(-1);
+	}
+	if (!a.pressed && d.pressed) {
+		player1.Rotate(1);
+	}
+	if (w.pressed) {
+		glm::vec2 tmp_dir = movement_dirs[player1.rotation_state];
+		tmp_dir += player1.dir;
+		player1.dir = glm::normalize(tmp_dir);
+		player1.spd = Player::PlayerSpeed;
+		// add acceleration later?
+	} else if (s.pressed) {
+		player1.spd *= Player::BrakeDecel;
+	} else {
+		player1.spd *= Player::Deceleration;
+	}
+	player1.pos.x += player1.spd * elapsed * player1.dir.x;
+	player1.pos.y += player1.spd * elapsed * player1.dir.y;
+	// Decrement rotation cooldown (and decelerate?)
+	player1.rotation_cooldown -= elapsed;
+
+	// HANDLE player2 MOVEMENT
+	// For now, copy-pasted from player1. Will move to be a member of Player later.
+	if (left.pressed && !right.pressed) {
+		player2.Rotate(-1);
+	}
+	if (!left.pressed && right.pressed) {
+		player2.Rotate(1);
+	}
+	if (up.pressed) {
+		glm::vec2 tmp_dir = movement_dirs[player2.rotation_state];
+		tmp_dir += player2.dir;
+		player2.dir = glm::normalize(tmp_dir);
+		player2.spd = Player::PlayerSpeed;
+		// add acceleration later?
+	} else if (down.pressed) {
+		player2.spd *= Player::BrakeDecel;
+	} else {
+		player2.spd *= Player::Deceleration;
+	}
+	player2.pos.x += player2.spd * elapsed * player2.dir.x;
+	player2.pos.y += player2.spd * elapsed * player2.dir.y;
+	// Decrement rotation cooldown (and decelerate?)
+	player2.rotation_cooldown -= elapsed;
 
 	//reset button press counters:
 	left.downs = 0;
 	right.downs = 0;
 	up.downs = 0;
 	down.downs = 0;
+	w.downs = 0;
+	a.downs = 0;
+	s.downs = 0;
+	d.downs = 0;
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	//--- set ppu state based on game state ---
 
 	//background color will be some hsv-like fade:
-	ppu.background_color = glm::u8vec4(
-		std::min(255,std::max(0,int32_t(255 * 0.5f * (0.5f + std::sin( 2.0f * M_PI * (background_fade + 0.0f / 3.0f) ) ) ))),
-		std::min(255,std::max(0,int32_t(255 * 0.5f * (0.5f + std::sin( 2.0f * M_PI * (background_fade + 1.0f / 3.0f) ) ) ))),
-		std::min(255,std::max(0,int32_t(255 * 0.5f * (0.5f + std::sin( 2.0f * M_PI * (background_fade + 2.0f / 3.0f) ) ) ))),
-		0xff
-	);
+	// ppu.background_color = glm::u8vec4(
+	// 	std::min(255,std::max(0,int32_t(255 * 0.5f * (0.5f + std::sin( 2.0f * M_PI * (background_fade + 0.0f / 3.0f) ) ) ))),
+	// 	std::min(255,std::max(0,int32_t(255 * 0.5f * (0.5f + std::sin( 2.0f * M_PI * (background_fade + 1.0f / 3.0f) ) ) ))),
+	// 	std::min(255,std::max(0,int32_t(255 * 0.5f * (0.5f + std::sin( 2.0f * M_PI * (background_fade + 2.0f / 3.0f) ) ) ))),
+	// 	0xff
+	// );
+	ppu.background_color = glm::u8vec4 (0, 0xff, 0xff, 0xff);
 
 	//tilemap gets recomputed every frame as some weird plasma thing:
 	//NOTE: don't do this in your game! actually make a map or something :-)
@@ -267,24 +366,30 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	}
 
 	//background scroll:
-	ppu.background_position.x = int32_t(-0.5f * player_at.x);
-	ppu.background_position.y = int32_t(-0.5f * player_at.y);
+	// ppu.background_position.x = int32_t(-0.5f * player1.pos.x);
+	// ppu.background_position.y = int32_t(-0.5f * player1.pos.y);
 
-	//player sprite:
-	ppu.sprites[0].x = int8_t(player_at.x);
-	ppu.sprites[0].y = int8_t(player_at.y);
-	ppu.sprites[0].index = 0;
+	//player1 sprite:
+	ppu.sprites[0].x = int8_t(player1.pos.x);
+	ppu.sprites[0].y = int8_t(player1.pos.y);
+	ppu.sprites[0].index = player1.rotation_state;
 	ppu.sprites[0].attributes = 0b00000001;
 
+	//player2 sprite:
+	ppu.sprites[1].x = int8_t(player2.pos.x);
+	ppu.sprites[1].y = int8_t(player2.pos.y);
+	ppu.sprites[1].index = player2.rotation_state;
+	ppu.sprites[1].attributes = 0b00000010;
+
 	//some other misc sprites:
-	for (uint32_t i = 1; i < 63; ++i) {
-		float amt = (i + 2.0f * background_fade) / 62.0f;
-		ppu.sprites[i].x = int8_t(0.5f * PPU466::ScreenWidth + std::cos( 2.0f * M_PI * amt * 5.0f + 0.01f * player_at.x) * 0.4f * PPU466::ScreenWidth);
-		ppu.sprites[i].y = int8_t(0.5f * PPU466::ScreenHeight + std::sin( 2.0f * M_PI * amt * 3.0f + 0.01f * player_at.y) * 0.4f * PPU466::ScreenWidth);
-		ppu.sprites[i].index = 32;
-		ppu.sprites[i].attributes = 6;
-		if (i % 2) ppu.sprites[i].attributes |= 0x80; //'behind' bit
-	}
+	// for (uint32_t i = 2; i < 63; ++i) {
+	// 	float amt = (i + 2.0f * background_fade) / 62.0f;
+	// 	ppu.sprites[i].x = int8_t(0.5f * PPU466::ScreenWidth + std::cos( 2.0f * M_PI * amt * 5.0f + 0.01f * player1.pos.x) * 0.4f * PPU466::ScreenWidth);
+	// 	ppu.sprites[i].y = int8_t(0.5f * PPU466::ScreenHeight + std::sin( 2.0f * M_PI * amt * 3.0f + 0.01f * player1.pos.y) * 0.4f * PPU466::ScreenWidth);
+	// 	ppu.sprites[i].index = 32;
+	// 	ppu.sprites[i].attributes = 6;
+	// 	if (i % 2) ppu.sprites[i].attributes |= 0x80; //'behind' bit
+	// }
 
 	//--- actually draw ---
 	ppu.draw(drawable_size);
