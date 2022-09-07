@@ -5,8 +5,39 @@
 
 //for glm::value_ptr() :
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #include <random>
+#include <iostream>
+#include <fstream>
+
+#include "Load.hpp"
+#include "data_path.hpp"
+
+Load< std::array< PPU466::Palette, 8 > > GamePalettes(LoadTagDefault, [](){
+    std::string palette_path = data_path("gen/palettes.sprinfo");
+
+    std::ifstream PaletteFile(palette_path, std::ios::in | std::ios::binary);
+
+    auto ret = new std::array< PPU466::Palette, 8 >;
+
+    char color_buf[5];
+    uint i = 0;
+    while(PaletteFile.getline(color_buf, 5)) {
+        uint row = i / 4; // 4 colors per palette
+        uint col = i % 4;
+        glm::u8vec4 cur_color (color_buf[0], color_buf[1], color_buf[2], 
+            color_buf[3]);
+        (*ret)[row][col] = cur_color;
+        ++i;
+    }
+    if (i != 32) {
+        throw std::runtime_error("Invalid number of colors read in palette.");
+    }
+    PaletteFile.close();
+
+    return ret;
+});
 
 PlayMode::PlayMode() {
 	//TODO:
@@ -60,48 +91,57 @@ PlayMode::PlayMode() {
 		0b01111110,
 	};
 	ppu.tile_table[32].bit1 = {
-		0b00000000,
-		0b00000000,
+		0b00100100,
+		0b00111100,
+		0b00111100,
 		0b00011000,
-		0b00100100,
-		0b00000000,
-		0b00100100,
+		0b01100110,
+		0b01100110,
 		0b00000000,
 		0b00000000,
 	};
+
+	ppu.palette_table = *GamePalettes;
 
 	//makes the outside of tiles 0-16 solid:
-	ppu.palette_table[0] = {
-		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	};
+	// ppu.palette_table[0] = {
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+	// };
 
-	//makes the center of tiles 0-16 solid:
-	ppu.palette_table[1] = {
-		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	};
+	// //makes the center of tiles 0-16 solid:
+	// ppu.palette_table[1] = {
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+	// };
 
-	//used for the player:
-	ppu.palette_table[7] = {
-		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-		glm::u8vec4(0xff, 0xff, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	};
+	// //used for the player:
+	// ppu.palette_table[7] = {
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+	// 	glm::u8vec4(0xff, 0xff, 0x00, 0xff),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+	// };
 
-	//used for the misc other sprites:
-	ppu.palette_table[6] = {
-		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-		glm::u8vec4(0x88, 0x88, 0xff, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-		glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-	};
-
+	// //used for the misc other sprites:
+	// ppu.palette_table[6] = {
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+	// 	glm::u8vec4(0x88, 0x88, 0xff, 0xff),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
+	// };
+	for (uint i = 0; i < 8; i++) {
+		std::cout << "color " << i << ": ";
+		std::cout << glm::to_string(ppu.palette_table[i][0]);
+		std::cout << glm::to_string(ppu.palette_table[i][1]);
+		std::cout << glm::to_string(ppu.palette_table[i][2]);
+		std::cout << glm::to_string(ppu.palette_table[i][3]);
+		std::cout << std::endl;
+	}
 }
 
 PlayMode::~PlayMode() {
