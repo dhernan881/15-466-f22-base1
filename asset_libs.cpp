@@ -59,3 +59,23 @@ bool load_player_sprites(std::vector<glm::u8vec4> *data) {
 
     return true;
 }
+
+bool write_player_sprites_file(std::vector<glm::u8vec4> *data) {
+    std::string filename = data_path("gen/player.sprinfo");
+
+    std::ofstream SpriteFile(filename, std::ios::out | std::ios::binary);
+
+    uint i = 0;
+    for (auto &it : *data) {
+        char color = it.x / 85;
+        SpriteFile.write(&color, 1);
+        if (i % 8 == 7) {
+            color = '\n';
+            SpriteFile.write(&color, 1);
+        }
+        ++i;
+    }
+
+    SpriteFile.close();
+    return true;
+}
