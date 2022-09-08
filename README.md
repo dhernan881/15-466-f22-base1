@@ -10,7 +10,7 @@ water. The game is also player-versus-player, which offers more replayability.
 
 ## Screen Shot:
 
-![Screen Shot](screenshot.png)
+![Screen Shot](battle-rafts-screenshot.png)
 
 ## Asset Formatting:
 
