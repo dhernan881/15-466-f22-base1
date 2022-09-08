@@ -49,5 +49,36 @@ int main(int argc, char **argv) {
         std::cerr << "Error writing water sprite data to .sprinfo file." << std::endl;
         return 1;
     }
+    std::cout << "Water sprites successfully compiled to .sprinfo file!" << std::endl;
+
+    // Load the bullet sprites.
+    std::vector<glm::u8vec4> bullet_sprite_data;
+    if (!load_sprites(&bullet_sprite_data, data_path("assets/spritesheets/bullet.png"),
+            8, 8 * 8)) {
+        std::cerr << "Error loading bullet sprites." << std::endl;
+        return 1;
+    }
+    std::cout << "Bullet sprites loaded successfully!" << std::endl;
+    // Write the bullet sprites to a .sprinfo file.
+    if (!write_sprites_file(&bullet_sprite_data, data_path("gen/bullet.sprinfo"))) {
+        std::cerr << "Error writing bullet sprite data to .sprinfo file." << std::endl;
+        return 1;
+    }
+    std::cout << "Bullet sprites successfully compiled to .sprinfo file!" << std::endl;
+
+    // Load the text sprites.
+    std::vector<glm::u8vec4> text_sprite_data;
+    if (!load_sprites(&text_sprite_data, data_path("assets/spritesheets/text.png"),
+            8, 8 * 8)) {
+        std::cerr << "Error loading text sprites." << std::endl;
+        return 1;
+    }
+    std::cout << "Text sprites loaded successfully!" << std::endl;
+    // Write the text sprites to a .sprinfo file.
+    if (!write_sprites_file(&text_sprite_data, data_path("gen/text.sprinfo"))) {
+        std::cerr << "Error writing text sprite data to .sprinfo file." << std::endl;
+        return 1;
+    }
+    std::cout << "Text sprites successfully compiled to .sprinfo file!" << std::endl;
     return 0;
 }
