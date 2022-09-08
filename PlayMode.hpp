@@ -26,8 +26,10 @@ struct PlayMode : Mode {
 
 	//some weird background animation:
 	float background_fade = 0.0f;
+	static constexpr float bg_scroll_speed = 10.0f;
+	double total_time = 0.0;
 
-	std::array< glm::vec2, 16 > movement_dirs = {
+	static constexpr std::array< glm::vec2, 16 > movement_dirs = {
 		glm::vec2(0.0f, 1.0f),
 		glm::vec2(0.382683f, 0.923879f),
 		glm::vec2(0.707106f, 0.707106f),

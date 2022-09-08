@@ -16,6 +16,10 @@
 #include "Load.hpp"
 #include "data_path.hpp"
 
+double background_scroll_fn(double t) {
+	return 6.0 * std::sin(0.1 * t) + 0.3 * t;
+}
+
 Load< std::array< PPU466::Palette, 8 > > GamePalettes(LoadTagDefault, [](){
     std::string palette_path = data_path("gen/palettes.sprinfo");
     std::ifstream PaletteFile(palette_path, std::ios::in | std::ios::binary);
@@ -60,6 +64,26 @@ Load< std::array< std::array< uint8_t , 8 >, 8 * 16 > > PlayerSpriteInfo(LoadTag
 	return ret;
 });
 
+Load< std::array< std::array< uint8_t , 8 >, 8 * 8 > > WaterSpriteInfo(LoadTagDefault, [] () {
+	std::string sprite_path = data_path("gen/water.sprinfo");
+	std::ifstream SpriteFile(sprite_path, std::ios::in | std::ios::binary);
+
+	auto ret = new std::array< std::array< uint8_t , 8 >, 8 * 8 >;
+
+	char color_buf[9];
+	uint i = 0;
+	while (SpriteFile.getline(color_buf, 9)) {
+		std::copy(std::begin(color_buf), std::begin(color_buf) + 8, (*ret)[i].begin());
+		++i;
+	}
+	if (i != 8 * 8) {
+		throw std::runtime_error("Invalid number of colors read in water spritesheet.");
+	}
+
+	SpriteFile.close();
+	return ret;
+});
+
 PlayMode::PlayMode() {
 	//TODO:
 	// you *must* use an asset pipeline of some sort to generate tiles.
@@ -68,39 +92,9 @@ PlayMode::PlayMode() {
 	//  make yourself a script that spits out the code that you paste in here
 	//   and check that script into your repository.
 
-	//Also, *don't* use these tiles in your game:
-
-	// { //use tiles 0-16 as some weird dot pattern thing:
-	// 	std::array< uint8_t, 8*8 > distance;
-	// 	for (uint32_t y = 0; y < 8; ++y) {
-	// 		for (uint32_t x = 0; x < 8; ++x) {
-	// 			float d = glm::length(glm::vec2((x + 0.5f) - 4.0f, (y + 0.5f) - 4.0f));
-	// 			d /= glm::length(glm::vec2(4.0f, 4.0f));
-	// 			distance[x+8*y] = uint8_t(std::max(0,std::min(255,int32_t( 255.0f * d ))));
-	// 		}
-	// 	}
-	// 	for (uint32_t index = 0; index < 16; ++index) {
-	// 		PPU466::Tile tile;
-	// 		uint8_t t = uint8_t((255 * index) / 16);
-	// 		for (uint32_t y = 0; y < 8; ++y) {
-	// 			uint8_t bit0 = 0;
-	// 			uint8_t bit1 = 0;
-	// 			for (uint32_t x = 0; x < 8; ++x) {
-	// 				uint8_t d = distance[x+8*y];
-	// 				if (d > t) {
-	// 					bit0 |= (1 << x);
-	// 				} else {
-	// 					bit1 |= (1 << x);
-	// 				}
-	// 			}
-	// 			tile.bit0[y] = bit0;
-	// 			tile.bit1[y] = bit1;
-	// 		}
-	// 		ppu.tile_table[index] = tile;
-	// 	}
-	// }
-
-	// Load player sprites into the tile table
+	// Load player sprites into the tile table.
+	// May make a separate function for this later.
+	// Tiles 0-15 are reserved for the player animations.
 	for (uint y = 0; y < 8 * 16; y++) {
 		ppu.tile_table[y / 8].bit0[7 - (y % 8)] = 0;
 		ppu.tile_table[y / 8].bit1[7 - (y % 8)] = 0;
@@ -118,70 +112,36 @@ PlayMode::PlayMode() {
 			ppu.tile_table[y / 8].bit1[7 - (y % 8)] = cur_bit1;
 		}
 	}
+	// Tiles 16-63 are reserved for if I decide to expand the player to 16x16.
 
-	//use sprite 32 as a "player":
-	// ppu.tile_table[32].bit0 = {
-	// 	0b01111110,
-	// 	0b11111111,
-	// 	0b11111111,
-	// 	0b11111111,
-	// 	0b11111111,
-	// 	0b11111111,
-	// 	0b11111111,
-	// 	0b01111110,
-	// };
-	// ppu.tile_table[32].bit1 = {
-	// 	0b00100100,
-	// 	0b00111100,
-	// 	0b00111100,
-	// 	0b00011000,
-	// 	0b01100110,
-	// 	0b01100110,
-	// 	0b00000000,
-	// 	0b00000000,
-	// };
+	// Load the water sprites into the tile table.
+	// Same as for the player but with an offset.
+	// Tiles 64-71 are reserved for water details.
+	{
+		const uint offset = 64;
+		for (uint y = 0; y < 8 * 8; y++) {
+			ppu.tile_table[(y / 8) + offset].bit0[7 - (y % 8)] = 0;
+			ppu.tile_table[(y / 8) + offset].bit1[7 - (y % 8)] = 0;
+			for (uint x = 0; x < 8; x++) {
+				uint8_t cur_pixel_color = (*WaterSpriteInfo)[y][x];
+				// isolate the 0th and 1th bit
+				uint8_t pixel_b0 = cur_pixel_color & 0b01;
+				uint8_t pixel_b1 = (cur_pixel_color & 0b10) >> 1;
 
+				uint8_t cur_bit0 = ppu.tile_table[(y / 8) + offset].bit0[7 - (y % 8)];
+				cur_bit0 = cur_bit0 | (pixel_b0 << x);
+				ppu.tile_table[(y / 8) + offset].bit0[7 - (y % 8)] = cur_bit0;
+				uint8_t cur_bit1 = ppu.tile_table[(y / 8) + offset].bit1[7 - (y % 8)];
+				cur_bit1 = cur_bit1 | (pixel_b1 << x);
+				ppu.tile_table[(y / 8) + offset].bit1[7 - (y % 8)] = cur_bit1;
+			}
+		}
+	}
+	
+	// Tiles 72-79 are reserved for additional water details/animations.
+
+	// Load the palettes into the ppu's palette_table.
 	ppu.palette_table = *GamePalettes;
-
-	//makes the outside of tiles 0-16 solid:
-	// ppu.palette_table[0] = {
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	// };
-
-	// //makes the center of tiles 0-16 solid:
-	// ppu.palette_table[1] = {
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	// };
-
-	// //used for the player:
-	// ppu.palette_table[7] = {
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-	// 	glm::u8vec4(0xff, 0xff, 0x00, 0xff),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	// };
-
-	// //used for the misc other sprites:
-	// ppu.palette_table[6] = {
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-	// 	glm::u8vec4(0x88, 0x88, 0xff, 0xff),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-	// 	glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-	// };
-	// for (uint i = 0; i < 8; i++) {
-	// 	std::cout << "color " << i << ": ";
-	// 	std::cout << glm::to_string(ppu.palette_table[i][0]);
-	// 	std::cout << glm::to_string(ppu.palette_table[i][1]);
-	// 	std::cout << glm::to_string(ppu.palette_table[i][2]);
-	// 	std::cout << glm::to_string(ppu.palette_table[i][3]);
-	// 	std::cout << std::endl;
-	// }
 
 	player1.pos = glm::vec2(0.0f);
 	player2.pos = glm::vec2(256.0 - 8.0f, 240.0 - 8.0f);
@@ -342,6 +302,9 @@ void PlayMode::update(float elapsed) {
 	a.downs = 0;
 	s.downs = 0;
 	d.downs = 0;
+
+	// Update global game timer
+	total_time += elapsed;
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
@@ -368,6 +331,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	//background scroll:
 	// ppu.background_position.x = int32_t(-0.5f * player1.pos.x);
 	// ppu.background_position.y = int32_t(-0.5f * player1.pos.y);
+	ppu.background_position.x = total_time * bg_scroll_speed;
+	ppu.background_position.y = background_scroll_fn(total_time * bg_scroll_speed);
 
 	//player1 sprite:
 	ppu.sprites[0].x = int8_t(player1.pos.x);
