@@ -108,7 +108,8 @@ const game_objs = [
 	maek.CPP('data_path.cpp'),
 	maek.CPP('Mode.cpp'),
 	maek.CPP('gl_compile_program.cpp'),
-	maek.CPP('GL.cpp')
+	maek.CPP('GL.cpp'),
+	maek.CPP('asset_libs.cpp')
 ];
 
 //the '[exeFile =] LINK(objFiles, exeFileBase, [, options])' links an array of objects into an executable:
@@ -116,6 +117,21 @@ const game_objs = [
 // exeFileBase: name of executable file to produce
 //returns exeFile: exeFileBase + a platform-dependant suffix (e.g., '.exe' on windows)
 const game_exe = maek.LINK(game_objs, 'dist/game');
+
+const asset_converter_objs = [
+	maek.CPP('data_path.cpp'),
+	maek.CPP('load_save_png.cpp'),
+	maek.CPP('asset_libs.cpp'),
+	maek.CPP('asset_converter_main.cpp'),
+	maek.CPP('gl_compile_program.cpp'),
+	maek.CPP('GL.cpp')
+]
+
+const asset_converter_exe = maek.LINK(asset_converter_objs, 'dist/asset_converter');
+
+maek.RULE([':run'], [game_exe], [
+	[game_exe, '--some-command-line-option']
+]);
 
 //set the default target to the game (and copy the readme files):
 maek.TARGETS = [game_exe, ...copies];
