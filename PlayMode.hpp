@@ -26,6 +26,7 @@ struct PlayMode : Mode {
 
 	//some weird background animation:
 	float background_fade = 0.0f;
+	static constexpr uint num_water_details = 80;
 	static constexpr float bg_scroll_speed = 10.0f;
 	double total_time = 0.0;
 

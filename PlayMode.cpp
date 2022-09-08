@@ -92,6 +92,12 @@ PlayMode::PlayMode() {
 	//  make yourself a script that spits out the code that you paste in here
 	//   and check that script into your repository.
 
+	// Load the palettes into the ppu's palette_table.
+	ppu.palette_table = *GamePalettes;
+
+	player1.pos = glm::vec2(0.0f);
+	player2.pos = glm::vec2(256.0 - 8.0f, 240.0 - 8.0f);
+
 	// Load player sprites into the tile table.
 	// May make a separate function for this later.
 	// Tiles 0-15 are reserved for the player animations.
@@ -137,14 +143,34 @@ PlayMode::PlayMode() {
 			}
 		}
 	}
-	
 	// Tiles 72-79 are reserved for additional water details/animations.
 
-	// Load the palettes into the ppu's palette_table.
-	ppu.palette_table = *GamePalettes;
+	// Tile 255 is fully-transparent.
+	ppu.tile_table[255].bit0 = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+	ppu.tile_table[255].bit1 = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
-	player1.pos = glm::vec2(0.0f);
-	player2.pos = glm::vec2(256.0 - 8.0f, 240.0 - 8.0f);
+	// Initialize background to fully-transparent.
+	for (uint32_t y = 0; y < PPU466::BackgroundHeight; ++y) {
+		for (uint32_t x = 0; x < PPU466::BackgroundWidth; ++x) {
+			// Tile 255, palette 0.
+			ppu.background[x+PPU466::BackgroundWidth*y] = 0xFF;
+		}
+	}
+	// Place random details in the background.
+	{
+		const uint16_t bg_base = 0b11 << 8; // Use the bg palette.
+		// From https://cplusplus.com/reference/random/uniform_int_distribution/
+		std::default_random_engine generator;
+		std::uniform_int_distribution<uint> x_dist(0, ppu.BackgroundWidth - 1);
+		std::uniform_int_distribution<uint> y_dist(0, ppu.BackgroundHeight - 1);
+		std::uniform_int_distribution<uint> water_dist(64, 64 + 8 - 1);
+		for (uint i = 0; i < num_water_details; i++) {
+			uint x = x_dist(generator);
+			uint y = y_dist(generator);
+			uint tile = water_dist(generator);
+			ppu.background[x + PPU466::BackgroundWidth * y] = bg_base | tile;
+		}
+	}
 }
 
 PlayMode::~PlayMode() {
@@ -318,15 +344,6 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	// 	0xff
 	// );
 	ppu.background_color = glm::u8vec4 (0, 0xff, 0xff, 0xff);
-
-	//tilemap gets recomputed every frame as some weird plasma thing:
-	//NOTE: don't do this in your game! actually make a map or something :-)
-	for (uint32_t y = 0; y < PPU466::BackgroundHeight; ++y) {
-		for (uint32_t x = 0; x < PPU466::BackgroundWidth; ++x) {
-			//TODO: make weird plasma thing
-			ppu.background[x+PPU466::BackgroundWidth*y] = ((x+y)%16);
-		}
-	}
 
 	//background scroll:
 	// ppu.background_position.x = int32_t(-0.5f * player1.pos.x);
